@@ -81,18 +81,35 @@ im_test3 = ski.segmentation.morphological_geodesic_active_contour(
 )
 im_test3 = ski.measure.label(im_test3)
 
+im_test_iterations = []
+n_iterations = [10, 50, 100, 150, 200, 250, 300, 400, 500]
+for n_iteration in n_iterations:
+    im_test_iterations.append(
+        ski.segmentation.morphological_geodesic_active_contour(
+            gradient,
+            num_iter=n_iteration,
+            init_level_set=init_ls,
+            smoothing=1,
+            balloon=-1,
+            threshold=0.69,
+        )
+    )
+
+additional_method_names = [f"MGAC n_iteration={n_iter}" for n_iter in n_iterations]
+additional_short_names = [f"MGAC ({n_iter})" for n_iter in n_iterations]
+
 method_names = [
     'Compact watershed',
     'Canny filter',
     'Morphological Geodesic Active Contours',
-]
-short_method_names = ['Compact WS', 'Canny', 'GAC']
+] + additional_method_names
+short_method_names = ['Compact WS', 'Canny', 'GAC'] + additional_short_names
 
 precision_list = []
 recall_list = []
 split_list = []
 merge_list = []
-for name, im_test in zip(method_names, [im_test1, im_test2, im_test3]):
+for name, im_test in zip(method_names, [im_test1, im_test2, im_test3] + im_test_iterations):
     error, precision, recall = ski.metrics.adapted_rand_error(im_true, im_test)
     splits, merges = ski.metrics.variation_of_information(im_true, im_test)
     split_list.append(splits)
@@ -106,7 +123,7 @@ for name, im_test in zip(method_names, [im_test1, im_test2, im_test3]):
     print(f'False Splits: {splits}')
     print(f'False Merges: {merges}')
 
-fig, axes = plt.subplots(2, 3, figsize=(9, 6), constrained_layout=True)
+fig, axes = plt.subplots(4, 3, figsize=(10, 12), constrained_layout=True)
 ax = axes.ravel()
 
 ax[0].scatter(merge_list, split_list)
@@ -129,16 +146,23 @@ ax[2].imshow(ski.segmentation.mark_boundaries(image, im_true))
 ax[2].set_title('True Segmentation')
 ax[2].set_axis_off()
 
-ax[3].imshow(ski.segmentation.mark_boundaries(image, im_test1))
-ax[3].set_title('Compact Watershed')
-ax[3].set_axis_off()
+# ax[3].imshow(ski.segmentation.mark_boundaries(image, im_test1))
+# ax[3].set_title('Compact Watershed')
+# ax[3].set_axis_off()
+#
+# ax[4].imshow(ski.segmentation.mark_boundaries(image, im_test2))
+# ax[4].set_title('Edge Detection')
+# ax[4].set_axis_off()
+#
+# ax[5].imshow(ski.segmentation.mark_boundaries(image, im_test3))
+# ax[5].set_title('Morphological GAC')
+# ax[5].set_axis_off()
 
-ax[4].imshow(ski.segmentation.mark_boundaries(image, im_test2))
-ax[4].set_title('Edge Detection')
-ax[4].set_axis_off()
-
-ax[5].imshow(ski.segmentation.mark_boundaries(image, im_test3))
-ax[5].set_title('Morphological GAC')
-ax[5].set_axis_off()
+for i in range(len(n_iterations)):
+    ax[3+i].imshow(ski.segmentation.mark_boundaries(
+        image, im_test_iterations[i], color=(1, 0, 0)
+    ))
+    ax[3+i].set_title(f'MGAC with {n_iterations[i]} iterations')
+    ax[3+i].set_axis_off()
 
 plt.show()

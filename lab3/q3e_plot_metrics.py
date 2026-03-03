@@ -15,12 +15,18 @@ affect the different scores.
 """
 
 import numpy as np
+import cv2
 import matplotlib.pyplot as plt
 from scipy import ndimage as ndi
 import skimage as ski
 
+import sys
+if sys.platform == "darwin":
+    import matplotlib
+    matplotlib.use("TkAgg")  # due to a bug on MacOS, just ignore it...
 
-image = ski.data.coins()
+
+image = cv2.imread("fruit_gray.PNG", cv2.IMREAD_GRAYSCALE)
 
 ###############################################################################
 # First, we generate the true segmentation. For this simple image, we know
@@ -42,8 +48,10 @@ im_true = ndi.label(ndi.binary_fill_holes(im_true - 1))[0]
 # final result. We will see how this causes the oversegmentation metrics to
 # shoot up.
 
+parameters_watershed = {"markers": 120, "compactness": 0.0002}
+
 edges = ski.filters.sobel(image)
-im_test1 = ski.segmentation.watershed(edges, markers=468, compactness=0.001)
+im_test1 = ski.segmentation.watershed(edges, **parameters_watershed)
 
 ###############################################################################
 # The next approach uses the Canny edge filter, :func:`skimage.feature.canny`.
@@ -65,75 +73,86 @@ im_test2 = ndi.label(ski.morphology.remove_small_objects(fill_coins, max_size=20
 image = ski.util.img_as_float(image)
 gradient = ski.segmentation.inverse_gaussian_gradient(image)
 init_ls = np.zeros(image.shape, dtype=np.int8)
-init_ls[10:-10, 10:-10] = 1
+init_ls[30:-5, 10:-10] = 1
+
+parameters_mgac = {
+    "num_iter": 500,
+    "smoothing": 2,
+    "balloon": -0.8,
+    "threshold": 0.67
+}
 im_test3 = ski.segmentation.morphological_geodesic_active_contour(
     gradient,
-    num_iter=100,
     init_level_set=init_ls,
-    smoothing=1,
-    balloon=-1,
-    threshold=0.69,
+    **parameters_mgac
 )
 im_test3 = ski.measure.label(im_test3)
 
-method_names = [
-    'Compact watershed',
-    'Canny filter',
-    'Morphological Geodesic Active Contours',
-]
-short_method_names = ['Compact WS', 'Canny', 'GAC']
+print("Parameters for Watershed:")
+print(", ".join([f"{k}={v}" for k, v in parameters_watershed.items()]))
 
-precision_list = []
-recall_list = []
-split_list = []
-merge_list = []
-for name, im_test in zip(method_names, [im_test1, im_test2, im_test3]):
-    error, precision, recall = ski.metrics.adapted_rand_error(im_true, im_test)
-    splits, merges = ski.metrics.variation_of_information(im_true, im_test)
-    split_list.append(splits)
-    merge_list.append(merges)
-    precision_list.append(precision)
-    recall_list.append(recall)
-    print(f'\n## Method: {name}')
-    print(f'Adapted Rand error: {error}')
-    print(f'Adapted Rand precision: {precision}')
-    print(f'Adapted Rand recall: {recall}')
-    print(f'False Splits: {splits}')
-    print(f'False Merges: {merges}')
+print("\nParameters for MGAC:")
+print(", ".join([f"{k}={v}" for k, v in parameters_mgac.items()]))
 
-fig, axes = plt.subplots(2, 3, figsize=(9, 6), constrained_layout=True)
+
+# method_names = [
+#     'Compact watershed',
+#     'Canny filter',
+#     'Morphological Geodesic Active Contours',
+# ]
+# short_method_names = ['Compact WS', 'Canny', 'GAC']
+#
+# precision_list = []
+# recall_list = []
+# split_list = []
+# merge_list = []
+# for name, im_test in zip(method_names, [im_test1, im_test2, im_test3]):
+#     error, precision, recall = ski.metrics.adapted_rand_error(im_true, im_test)
+#     splits, merges = ski.metrics.variation_of_information(im_true, im_test)
+#     split_list.append(splits)
+#     merge_list.append(merges)
+#     precision_list.append(precision)
+#     recall_list.append(recall)
+#     print(f'\n## Method: {name}')
+#     print(f'Adapted Rand error: {error}')
+#     print(f'Adapted Rand precision: {precision}')
+#     print(f'Adapted Rand recall: {recall}')
+#     print(f'False Splits: {splits}')
+#     print(f'False Merges: {merges}')
+
+fig, axes = plt.subplots(1, 3, figsize=(12, 4), constrained_layout=True)
 ax = axes.ravel()
 
-ax[0].scatter(merge_list, split_list)
-for i, txt in enumerate(short_method_names):
-    ax[0].annotate(txt, (merge_list[i], split_list[i]), verticalalignment='center')
-ax[0].set_xlabel('False Merges (bits)')
-ax[0].set_ylabel('False Splits (bits)')
-ax[0].set_title('Split Variation of Information')
+# ax[0].scatter(merge_list, split_list)
+# for i, txt in enumerate(short_method_names):
+#     ax[0].annotate(txt, (merge_list[i], split_list[i]), verticalalignment='center')
+# ax[0].set_xlabel('False Merges (bits)')
+# ax[0].set_ylabel('False Splits (bits)')
+# ax[0].set_title('Split Variation of Information')
+#
+# ax[1].scatter(precision_list, recall_list)
+# for i, txt in enumerate(short_method_names):
+#     ax[1].annotate(txt, (precision_list[i], recall_list[i]), verticalalignment='center')
+# ax[1].set_xlabel('Precision')
+# ax[1].set_ylabel('Recall')
+# ax[1].set_title('Adapted Rand precision vs. recall')
+# ax[1].set_xlim(0, 1)
+# ax[1].set_ylim(0, 1)
+#
+# ax[2].imshow(ski.segmentation.mark_boundaries(image, im_true))
+# ax[2].set_title('True Segmentation')
+# ax[2].set_axis_off()
 
-ax[1].scatter(precision_list, recall_list)
-for i, txt in enumerate(short_method_names):
-    ax[1].annotate(txt, (precision_list[i], recall_list[i]), verticalalignment='center')
-ax[1].set_xlabel('Precision')
-ax[1].set_ylabel('Recall')
-ax[1].set_title('Adapted Rand precision vs. recall')
-ax[1].set_xlim(0, 1)
-ax[1].set_ylim(0, 1)
+ax[0].imshow(ski.segmentation.mark_boundaries(image, im_test1))
+ax[0].set_title('Compact Watershed')
+ax[0].set_axis_off()
 
-ax[2].imshow(ski.segmentation.mark_boundaries(image, im_true))
-ax[2].set_title('True Segmentation')
+ax[1].imshow(ski.segmentation.mark_boundaries(image, im_test2))
+ax[1].set_title('Edge Detection')
+ax[1].set_axis_off()
+
+ax[2].imshow(ski.segmentation.mark_boundaries(image, im_test3))
+ax[2].set_title('Morphological GAC')
 ax[2].set_axis_off()
-
-ax[3].imshow(ski.segmentation.mark_boundaries(image, im_test1))
-ax[3].set_title('Compact Watershed')
-ax[3].set_axis_off()
-
-ax[4].imshow(ski.segmentation.mark_boundaries(image, im_test2))
-ax[4].set_title('Edge Detection')
-ax[4].set_axis_off()
-
-ax[5].imshow(ski.segmentation.mark_boundaries(image, im_test3))
-ax[5].set_title('Morphological GAC')
-ax[5].set_axis_off()
 
 plt.show()
