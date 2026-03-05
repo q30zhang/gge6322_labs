@@ -1,15 +1,5 @@
 import numpy as np
-from scipy import signal
-from scipy import ndimage as ndi
-import skimage.io
-from skimage.filters import gaussian, sobel, prewitt, roberts, scharr
-from skimage.feature import blob_dog, blob_log, blob_doh
-from skimage.feature import CENSURE, ORB, SIFT
-from skimage.feature import corner_harris, corner_shi_tomasi
-from skimage.feature import corner_subpix, corner_peaks
 from skimage.transform import warp, AffineTransform
-from skimage.color import rgb2gray
-from skimage import data
 import matplotlib.pyplot as plt
 import cv2
 import functools
